@@ -1,10 +1,10 @@
-# Chihuahua Game 🐕
+# RL Chihuahua Game
 
 > A 2D Chihuahua-themed reinforcement learning environment built with Pygame and Gymnasium.
 
 ---
 
-## 🚀 Overview
+## Overview
 
 2D Pygame game and environment for reinforcement learning. It includes:
 
@@ -16,7 +16,7 @@ Check out my another work in progress project: [Car Game](https://github.com/uma
 
 ---
 
-## 📋 Table of Contents
+## Table of Contents
 
 1. [Features](#-features)
 2. [Prerequisites](#-prerequisites)
@@ -28,7 +28,7 @@ Check out my another work in progress project: [Car Game](https://github.com/uma
 
 ---
 
-## 🎮 Features
+## Features
 
 * Discrete Reinforcement Learning environment
 * Collision-based rewards: hitting a target tile
@@ -43,7 +43,7 @@ Check out my another work in progress project: [Car Game](https://github.com/uma
 
 ### Project structure
 
-The project is organized into modular components, separating game logic, assets, environment definitions, and training scripts:
+Modular components: game logic, assets, environment definitions, and training scripts:
 
 ``` bash
 ├── assets/              # Game assets (sprites, tiles)
@@ -74,7 +74,7 @@ The project is organized into modular components, separating game logic, assets,
 
 ---
 
-## 🔧 Prerequisites
+## Prerequisites
 
 * **Python 3.7+**
 * uv (recommended)
@@ -84,7 +84,7 @@ The project is organized into modular components, separating game logic, assets,
 
 <a name="installation"></a>
 
-## ⚙️ Installation
+## Installation
 
 1. Clone the repo:
 
@@ -111,7 +111,7 @@ The project is organized into modular components, separating game logic, assets,
 
 <a name="usage"></a>
 
-## ▶️ Usage
+## Usage
 
 Play the game with: (Use arrow keys (← ↑ → ↓) to move your chihuahua. Enjoy!)
 
@@ -145,7 +145,7 @@ Look training in real time with:
 
 ---
 
-## 🧠 RL Setup
+## RL Setup
 
 ### Description and goal
 
@@ -236,7 +236,7 @@ This plot shows how long episodes last (in steps), averaged over evaluations:
 
 ---
 
-### 🕒 Training stats
+### Training stats
 
 - **Duration**: ~2.5 hours  
 - **Steps**: 500,000  
@@ -245,7 +245,7 @@ This plot shows how long episodes last (in steps), averaged over evaluations:
 
 ---
 
-### 🙊 Bloopers
+### Bloopers
 
 #### Reward pitfall
 
@@ -275,7 +275,7 @@ As a result, the agent learned to exploit this by only looking for partial rewar
 
 <a name="custom-levels"></a>
 
-## 🛠️ Custom Levels
+## Custom Levels
 
 Define JSON layout files in the levels/ folder
 
@@ -283,14 +283,12 @@ Add custom tilemaps, special blocks, or enemies
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
-Contributions are welcome! Please:
-
-1. Fork this repository.
-2. Create a feature branch: `git checkout -b feature/my-feature`
-3. Commit your changes: `git commit -m "Add my feature"`
-4. Push to the branch: `git push origin feature/my-feature`
-5. Open a pull request.
+1. Fork .
+2. Feature branch: `git checkout -b feature/my-feature`
+3. Commit: `git commit -m "Add my feature"`
+4. Push: `git push origin feature/my-feature`
+5. Pull Request.
 
 ---
