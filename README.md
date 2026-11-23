@@ -8,9 +8,9 @@
 
 2D Pygame game and environment for reinforcement learning. It includes:
 
-* A custom RL environment compatible with Gymnasium
-* Modular game structure using Pygame (clean architecture)
-* **Object-Oriented Programming (OOP)** for organizing game logic
+- A custom RL environment compatible with Gymnasium
+- Modular game structure using Pygame (clean architecture)
+- **Object-Oriented Programming (OOP)** for organizing game logic
 
 Check out my another work in progress project: [Car Game](https://github.com/uma-dev/car-game).
 
@@ -30,12 +30,12 @@ Check out my another work in progress project: [Car Game](https://github.com/uma
 
 ## Features
 
-* Discrete Reinforcement Learning environment
-* Collision-based rewards: hitting a target tile
-* Partial rewards: getting the ball near to the target tile
-* Frame-based animation, sprites, basic physics and level loading
-* Easy to integrate with Gym-based RL pipelines
-* Playable characters with simple animations (render states)
+- Discrete Reinforcement Learning environment
+- Collision-based rewards: hitting a target tile
+- Partial rewards: getting the ball near to the target tile
+- Frame-based animation, sprites, basic physics and level loading
+- Easy to integrate with Gym-based RL pipelines
+- Playable characters with simple animations (render states)
 
 <p align="center">
   <img alt="Digitalization" src="https://github.com/user-attachments/assets/4cbf36be-3d27-47a0-a164-aeee6a9abd8a">
@@ -45,7 +45,7 @@ Check out my another work in progress project: [Car Game](https://github.com/uma
 
 Modular components: game logic, assets, environment definitions, and training scripts:
 
-``` bash
+```bash
 ├── assets/              # Game assets (sprites, tiles)
 │   └── images/          # Character and tile images
 │       └── tiles/       # Grass, wall, and ring textures
@@ -69,16 +69,20 @@ Modular components: game logic, assets, environment definitions, and training sc
 
 ├── screens/             # UI screens (menu, gameplay, win state)
 
-└── utils/               # Constants, game states, shared helpers
+├── utils/               # Constants, game states, shared helpers
+
+├── pyproject.toml       # Project metadata and direct dependencies
+├── uv.lock              # Exact resolved versions (commit it)
+└── .python-version      # Python version used by uv
 ```
 
 ---
 
 ## Prerequisites
 
-* **Python 3.7+**
-* uv (recommended)
-* modules: pygame, gymnasium, tensorboard (see requirements.txt)
+- [uv](https://docs.astral.sh/uv/getting-started/installation/) — manages Python, the virtual environment and dependencies
+- Python **3.14** (pinned in `.python-version`; uv downloads it automatically if missing)
+- Uses [pygame-ce](https://pyga.me/) (the maintained community fork of pygame; same `import pygame`). Don't install `pygame` alongside it.
 
 ---
 
@@ -93,19 +97,13 @@ Modular components: game logic, assets, environment definitions, and training sc
    cd chihuahua-game
    ```
 
-2. (Optional) Create a virtual environment:
+2. Create the environment and install the exact locked dependencies:
 
    ```bash
-   uv venv 
-   source .venv/bin/activate  # Linux/macOS
-   .\.venv\Scripts\activate  # Windows
+   uv sync
    ```
 
-3. Install dependencies:
-
-   ```bash
-   uv pip install -r requirements.txt
-   ```
+   This creates `.venv/`, installs the pinned Python version and every package from `uv.lock`. No manual activation is needed — use `uv run`.
 
 ---
 
@@ -116,32 +114,45 @@ Modular components: game logic, assets, environment definitions, and training sc
 Play the game with: (Use arrow keys (← ↑ → ↓) to move your chihuahua. Enjoy!)
 
 ```bash
-python game.py
+uv run Game.py
 ```
 
 Train the model and observe the training process with:
 
 ```bash
-python main.py train_render 
+uv run main.py train_render
 ```
 
 Train the model without render:
 
 ```bash
-python main.py train_no_render 
+uv run main.py train_no_render
 ```
 
 Eval the policy with:
 
 ```bash
-python main.py eval
+uv run main.py eval
 ```
 
 Look training in real time with:
 
 ```bash
- tensorboard --logdir .\logs\ppo_tensorboard\
+uv run tensorboard --logdir logs/ppo_tensorboard
 ```
+
+### Managing dependencies
+
+| Task                               | Command                               |
+| ---------------------------------- | ------------------------------------- |
+| Add a dependency                   | `uv add <package>`                    |
+| Add a dev-only tool                | `uv add --dev <package>`              |
+| Remove a dependency                | `uv remove <package>`                 |
+| Upgrade one package                | `uv lock --upgrade-package <package>` |
+| Show dependency tree               | `uv tree`                             |
+| Verify lockfile is up to date (CI) | `uv sync --locked`                    |
+
+> Don't use `pip install` or `uv pip install` in this project: they change `.venv` without updating `pyproject.toml`/`uv.lock`, so the next `uv sync` will undo them. Always commit `pyproject.toml`, `uv.lock` and `.python-version` together.
 
 ---
 
@@ -161,10 +172,10 @@ The agent's objective is to learn how to move and act efficiently to guide the b
 
 ### Problem Formulation
 
-* **Algorithm:** PPO (Proximal Policy Optimization)
-* **Policy:** MLP (Multilayer Perceptron)
-* **Library:** Stable-Baselines3
-* **Logging:** TensorBoard (`logs/ppo_tensorboard/`)
+- **Algorithm:** PPO (Proximal Policy Optimization)
+- **Policy:** MLP (Multilayer Perceptron)
+- **Library:** Stable-Baselines3
+- **Logging:** TensorBoard (`logs/ppo_tensorboard/`)
 
 **State Space (Observation):**
 A vector of 10 values:
@@ -180,7 +191,7 @@ Discrete(5):
 0 = No-op, 1 = Left, 2 = Right, 3 = Jump, 4 = Sprint
 ```
 
-**Reward Function: (work in progress, as it directly changes the learning curve)** 
+**Reward Function: (work in progress, as it directly changes the learning curve)**
 
 ```python
 if ball_hits_target(self.ball, self.target):  # win condition
@@ -195,7 +206,7 @@ else:
 Training metrics are logged with **TensorBoard**, so you can monitor the agent's behavior over time:
 
 ```bash
-tensorboard --logdir logs/
+uv run tensorboard --logdir logs/
 ```
 
 ---
@@ -238,8 +249,8 @@ This plot shows how long episodes last (in steps), averaged over evaluations:
 
 ### Training stats
 
-- **Duration**: ~2.5 hours  
-- **Steps**: 500,000  
+- **Duration**: ~2.5 hours
+- **Steps**: 500,000
 - **Eval Interval**: Every 5,000 steps  
   (Note: Since episodes last ~1.7k steps, more than one episode might occur per eval.)
 
@@ -251,7 +262,7 @@ This plot shows how long episodes last (in steps), averaged over evaluations:
 
 Partial rewards can introduce unintended behaviors during training. In this blooper, the reward setup was wrong. Aiming to improve learning curves, I gave partial rewards to agent: either when moving the ball closer to the target or when hitting the ball. However, these partial rewards per step were greater than the penalty for each step. So, the total reward per step was positive!
 
-As a result, the agent learned to exploit this by only looking for partial rewards, so the episode mean also grows as is show in the results: 
+As a result, the agent learned to exploit this by only looking for partial rewards, so the episode mean also grows as is show in the results:
 
 <p align="center">
   <img
@@ -260,7 +271,6 @@ As a result, the agent learned to exploit this by only looking for partial rewar
 </p>
 
 > ⚠️ Looks ok, but take a loot to the episode lenght.
-
 
 <p align="center">
   <img
@@ -271,6 +281,7 @@ As a result, the agent learned to exploit this by only looking for partial rewar
 > ⚠️ The result of the reward pitfall. The agent learned to look for partial rewards.
 
 ---
+
 ---
 
 <a name="custom-levels"></a>
