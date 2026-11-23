@@ -82,6 +82,7 @@ Modular components: game logic, assets, environment definitions, and training sc
 
 - [uv](https://docs.astral.sh/uv/getting-started/installation/) — manages Python, the virtual environment and dependencies
 - Python **3.14** (pinned in `.python-version`; uv downloads it automatically if missing)
+- Uses [pygame-ce](https://pyga.me/) (the maintained community fork of pygame; same `import pygame`). Don't install `pygame` alongside it.
 
 ---
 
