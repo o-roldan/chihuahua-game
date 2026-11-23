@@ -69,16 +69,21 @@ Modular components: game logic, assets, environment definitions, and training sc
 
 ├── screens/             # UI screens (menu, gameplay, win state)
 
-└── utils/               # Constants, game states, shared helpers
+├── utils/               # Constants, game states, shared helpers
+
+├── pyproject.toml       # Project metadata and direct dependencies
+├── uv.lock              # Exact resolved versions (commit it)
+└── .python-version      # Python version used by uv
 ```
 
 ---
 
 ## Prerequisites
 
-* **Python 3.7+**
-* uv (recommended)
-* modules: pygame, gymnasium, tensorboard (see requirements.txt)
+* [uv](https://docs.astral.sh/uv/getting-started/installation/) — manages Python, the virtual environment and dependencies
+* Python **3.14** (pinned in `.python-version`; uv downloads it automatically if missing)
+
+Dependencies are declared in `pyproject.toml` and locked in `uv.lock` (pygame, gymnasium, stable-baselines3, numpy, tensorboard).
 
 ---
 
@@ -93,19 +98,13 @@ Modular components: game logic, assets, environment definitions, and training sc
    cd chihuahua-game
    ```
 
-2. (Optional) Create a virtual environment:
+2. Create the environment and install the exact locked dependencies:
 
    ```bash
-   uv venv 
-   source .venv/bin/activate  # Linux/macOS
-   .\.venv\Scripts\activate  # Windows
+   uv sync
    ```
 
-3. Install dependencies:
-
-   ```bash
-   uv pip install -r requirements.txt
-   ```
+   This creates `.venv/`, installs the pinned Python version and every package from `uv.lock`. No manual activation is needed — use `uv run`.
 
 ---
 
@@ -116,32 +115,45 @@ Modular components: game logic, assets, environment definitions, and training sc
 Play the game with: (Use arrow keys (← ↑ → ↓) to move your chihuahua. Enjoy!)
 
 ```bash
-python game.py
+uv run Game.py
 ```
 
 Train the model and observe the training process with:
 
 ```bash
-python main.py train_render 
+uv run main.py train_render
 ```
 
 Train the model without render:
 
 ```bash
-python main.py train_no_render 
+uv run main.py train_no_render
 ```
 
 Eval the policy with:
 
 ```bash
-python main.py eval
+uv run main.py eval
 ```
 
 Look training in real time with:
 
 ```bash
- tensorboard --logdir .\logs\ppo_tensorboard\
+uv run tensorboard --logdir logs/ppo_tensorboard
 ```
+
+### Managing dependencies
+
+| Task | Command |
+| --- | --- |
+| Add a dependency | `uv add <package>` |
+| Add a dev-only tool | `uv add --dev <package>` |
+| Remove a dependency | `uv remove <package>` |
+| Upgrade one package | `uv lock --upgrade-package <package>` |
+| Show dependency tree | `uv tree` |
+| Verify lockfile is up to date (CI) | `uv sync --locked` |
+
+> Don't use `pip install` or `uv pip install` in this project: they change `.venv` without updating `pyproject.toml`/`uv.lock`, so the next `uv sync` will undo them. Always commit `pyproject.toml`, `uv.lock` and `.python-version` together.
 
 ---
 
@@ -195,7 +207,7 @@ else:
 Training metrics are logged with **TensorBoard**, so you can monitor the agent's behavior over time:
 
 ```bash
-tensorboard --logdir logs/
+uv run tensorboard --logdir logs/
 ```
 
 ---
