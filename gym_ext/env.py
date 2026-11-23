@@ -26,6 +26,10 @@ class ChihuahuaEnv(gym.Env):
 
     metadata = {"render_modes": ["human"], "render_fps": 60}
 
+    # Fixed simulation timestep: physics advance 1/60 s per step regardless of
+    # wall-clock time -> deterministic and as fast as the CPU allows.
+    SIM_DT = 1.0 / metadata["render_fps"]
+
     def __init__(self, render_mode=None):
         super().__init__()
         assert render_mode is None or render_mode in self.metadata["render_modes"]
@@ -124,9 +128,8 @@ class ChihuahuaEnv(gym.Env):
             self.character.key_down(pygame.K_LSHIFT)
 
         # Update game physics
-        dt = self.clock.tick(self.metadata["render_fps"]) / 1000.0
-        self.character.update(dt)
-        self.ball.update(dt)
+        self.character.update(self.SIM_DT)
+        self.ball.update(self.SIM_DT)
 
         character_hits_ball(self.character, self.ball)
 
@@ -183,7 +186,10 @@ class ChihuahuaEnv(gym.Env):
         self.level.draw(self.screen)
         for ent in (self.character, self.ball, self.target):
             ent.draw(self.screen)
+        pygame.event.pump()  # keep the window responsive (OS event queue)
         pygame.display.flip()
+        # Throttle to real time only for viewing; physics use SIM_DT, not this.
+        self.clock.tick(self.metadata["render_fps"])
 
     def close(self):
         pygame.quit()
