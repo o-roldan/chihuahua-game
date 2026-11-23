@@ -9,6 +9,8 @@ from entities.ball import Ball
 from entities.target import Target
 from utils.constants import (
     BALL_MAX_SPEED,
+    CHARACTER_JUMP_FORCE,
+    CHARACTER_MAX_FALL_SPEED,
     CHARACTER_SPRINT_SPEED,
     COLORS,
     SCREEN_SIZE,
@@ -39,7 +41,7 @@ class ChihuahuaEnv(gym.Env):
                     0,  # char_x
                     0,  # char_y
                     -CHARACTER_SPRINT_SPEED,  # char_vx
-                    -CHARACTER_SPRINT_SPEED,  # char_vy
+                    -CHARACTER_JUMP_FORCE,  # char_vy (jump impulse)
                     0,  # ball_x
                     0,  # ball_y
                     -BALL_MAX_SPEED,  # ball_vx
@@ -54,7 +56,7 @@ class ChihuahuaEnv(gym.Env):
                     SCREEN_WIDTH,
                     SCREEN_HEIGHT,
                     CHARACTER_SPRINT_SPEED,
-                    CHARACTER_SPRINT_SPEED,
+                    CHARACTER_MAX_FALL_SPEED,  # char_vy (gravity cap)
                     SCREEN_WIDTH,
                     SCREEN_HEIGHT,
                     BALL_MAX_SPEED,

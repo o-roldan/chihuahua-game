@@ -3,6 +3,7 @@ from .gameentity import GameEntity
 from utils.States import AnimatedState, StaticState
 from utils.constants import (
     CHARACTER_JUMP_FORCE,
+    CHARACTER_MAX_FALL_SPEED,
     CHARACTER_SPEED,
     CHARACTER_SPRINT_SPEED,
     SCREEN_WIDTH,
@@ -78,7 +79,7 @@ class Character(GameEntity):
 
     def calculate_gravity(self):
         # simple gravity: accelerate down
-        self.dy = min(self.dy + 0.55, 10.0)
+        self.dy = min(self.dy + 0.55, CHARACTER_MAX_FALL_SPEED)
 
     def jump(self, force: float = 12):
         if not self.jumping:
