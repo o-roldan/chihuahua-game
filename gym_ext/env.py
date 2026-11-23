@@ -96,12 +96,12 @@ class ChihuahuaEnv(gym.Env):
     def _get_observation(self):
         return np.array(
             [
-                self.character.rect.x,
-                self.character.rect.y,
+                self.character.rect.centerx,
+                self.character.rect.centery,
                 self.character.dx,
                 self.character.dy,
-                self.ball.rect.x,
-                self.ball.rect.y,
+                self.ball.rect.centerx,
+                self.ball.rect.centery,
                 self.ball.velocity[0],
                 self.ball.velocity[1],
                 self.character.jumping,
@@ -132,8 +132,8 @@ class ChihuahuaEnv(gym.Env):
         reward = 0
         done = False
 
-        ball_pos = np.array([self.ball.rect.x, self.ball.rect.y])
-        tgt_pos = np.array([self.target.rect.x, self.target.rect.y])
+        ball_pos = np.array([self.ball.rect.centerx, self.ball.rect.centery])
+        tgt_pos = np.array([self.target.rect.centerx, self.target.rect.centery])
 
         if ball_hits_target(self.ball, self.target):  # win condition
             reward += 10.0
