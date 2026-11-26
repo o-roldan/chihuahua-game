@@ -9,6 +9,8 @@ from entities.ball import Ball
 from entities.target import Target
 from utils.constants import (
     BALL_MAX_SPEED,
+    CHARACTER_JUMP_FORCE,
+    CHARACTER_MAX_FALL_SPEED,
     CHARACTER_SPRINT_SPEED,
     COLORS,
     SCREEN_SIZE,
@@ -24,8 +26,17 @@ class ChihuahuaEnv(gym.Env):
 
     metadata = {"render_modes": ["human"], "render_fps": 60}
 
-    def __init__(self, render_mode=None):
+    # Fixed simulation timestep: physics advance 1/60 s per step regardless of
+    # wall-clock time -> deterministic and as fast as the CPU allows.
+    SIM_DT = 1.0 / metadata["render_fps"]
+
+    # Randomized starts (training only; eval keeps the canonical start):
+    # dog x, ball x ~ U(across the floor), ball velocity ~ U(-v, v) per axis.
+    RANDOM_START_BALL_SPEED = 5.0  # 25% of BALL_MAX_SPEED
+
+    def __init__(self, render_mode=None, random_start=False):
         super().__init__()
+        self.random_start = random_start
         assert render_mode is None or render_mode in self.metadata["render_modes"]
         self.render_mode = render_mode
 
@@ -39,7 +50,7 @@ class ChihuahuaEnv(gym.Env):
                     0,  # char_x
                     0,  # char_y
                     -CHARACTER_SPRINT_SPEED,  # char_vx
-                    -CHARACTER_SPRINT_SPEED,  # char_vy
+                    -CHARACTER_JUMP_FORCE,  # char_vy (jump impulse)
                     0,  # ball_x
                     0,  # ball_y
                     -BALL_MAX_SPEED,  # ball_vx
@@ -54,7 +65,7 @@ class ChihuahuaEnv(gym.Env):
                     SCREEN_WIDTH,
                     SCREEN_HEIGHT,
                     CHARACTER_SPRINT_SPEED,
-                    CHARACTER_SPRINT_SPEED,
+                    CHARACTER_MAX_FALL_SPEED,  # char_vy (gravity cap)
                     SCREEN_WIDTH,
                     SCREEN_HEIGHT,
                     BALL_MAX_SPEED,
@@ -86,22 +97,74 @@ class ChihuahuaEnv(gym.Env):
         self.target = Target(target_x, target_y)
         self.prev_ball_pos = np.array([ball_x, ball_y], dtype=np.float32)
 
-    def reset(self, *, seed=None, options=None):
-        super().reset(seed=seed)
+        # Canonical start state: every reset restores exactly this snapshot
+        # (previously animation timers leaked across episodes).
         self.character.reset()
         self.ball.reset()
+        self.prev_ball_pos = np.array(self.ball.rect.center, dtype=np.float32)
+        self._initial_state = self.get_state()
+
+    # ---- Snapshot API: the simulator itself is the model ----
+    # Surfaces are stored by reference (never mutated), everything else by value.
+    def get_state(self):
+        c, b = self.character, self.ball
+        return {
+            "char_rect": tuple(c.rect),
+            "char_motion": (c.dx, c.dy, c.jumping, c.sprinting),
+            "char_state": c.current_state.name,
+            "char_image": c.image,
+            "char_anim": {
+                k: (s.current_delta, s.current_sprite)
+                for k, s in c.states_dict.items()
+                if hasattr(s, "current_delta")
+            },
+            "ball_rect": tuple(b.rect),
+            "ball_velocity": tuple(b.velocity),
+            "ball_on_ground": b.on_ground,
+            "prev_ball_pos": self.prev_ball_pos.copy(),
+        }
+
+    def set_state(self, s):
+        c, b = self.character, self.ball
+        c.rect = pygame.Rect(s["char_rect"])
+        c.dx, c.dy, c.jumping, c.sprinting = s["char_motion"]
+        c.current_state = c.states_dict[s["char_state"]]
+        c.image = s["char_image"]
+        for k, (delta, sprite) in s["char_anim"].items():
+            c.states_dict[k].current_delta = delta
+            c.states_dict[k].current_sprite = sprite
+        b.rect = pygame.Rect(s["ball_rect"])
+        b.velocity = pygame.math.Vector2(s["ball_velocity"])
+        b.on_ground = s["ball_on_ground"]
+        self.prev_ball_pos = s["prev_ball_pos"].copy()
+
+    def _randomize_start(self):
+        c, b = self.character, self.ball
+        rng = self.np_random
+        c.rect.x = int(rng.integers(0, SCREEN_WIDTH - c.rect.width + 1))
+        half = b.rect.width // 2
+        b.rect.centerx = int(rng.integers(half, SCREEN_WIDTH - half + 1))
+        v = self.RANDOM_START_BALL_SPEED
+        b.velocity = pygame.math.Vector2(*rng.uniform(-v, v, size=2))
+        self.prev_ball_pos = np.array(b.rect.center, dtype=np.float32)
+
+    def reset(self, *, seed=None, options=None):
+        super().reset(seed=seed)
+        self.set_state(self._initial_state)
+        if self.random_start:
+            self._randomize_start()
         obs = self._get_observation()
         return obs, {}
 
     def _get_observation(self):
         return np.array(
             [
-                self.character.rect.x,
-                self.character.rect.y,
+                self.character.rect.centerx,
+                self.character.rect.centery,
                 self.character.dx,
                 self.character.dy,
-                self.ball.rect.x,
-                self.ball.rect.y,
+                self.ball.rect.centerx,
+                self.ball.rect.centery,
                 self.ball.velocity[0],
                 self.ball.velocity[1],
                 self.character.jumping,
@@ -110,7 +173,8 @@ class ChihuahuaEnv(gym.Env):
             dtype=np.float32,
         )
 
-    def step(self, action):
+    def _simulate(self, action):
+        """Advance the game one SIM_DT tick (no reward, no rendering)."""
         # 0: No-op
         if action == 1:  # Left
             self.character.key_down(pygame.K_LEFT)
@@ -122,18 +186,20 @@ class ChihuahuaEnv(gym.Env):
             self.character.key_down(pygame.K_LSHIFT)
 
         # Update game physics
-        dt = self.clock.tick(self.metadata["render_fps"]) / 1000.0
-        self.character.update(dt)
-        self.ball.update(dt)
+        self.character.update(self.SIM_DT)
+        self.ball.update(self.SIM_DT)
 
         character_hits_ball(self.character, self.ball)
+
+    def step(self, action):
+        self._simulate(action)
 
         # Reward
         reward = 0
         done = False
 
-        ball_pos = np.array([self.ball.rect.x, self.ball.rect.y])
-        tgt_pos = np.array([self.target.rect.x, self.target.rect.y])
+        ball_pos = np.array([self.ball.rect.centerx, self.ball.rect.centery])
+        tgt_pos = np.array([self.target.rect.centerx, self.target.rect.centery])
 
         if ball_hits_target(self.ball, self.target):  # win condition
             reward += 10.0
@@ -168,7 +234,9 @@ class ChihuahuaEnv(gym.Env):
         self.prev_ball_pos = ball_pos
 
         obs = self._get_observation()
-        info = {}
+        # SB3 logs rollout/success_rate from this key at episode end
+        # (False on timeouts too, so the rate is unbiased).
+        info = {"is_success": done}
 
         # Render if needed
         if self.render_mode == "human":
@@ -181,7 +249,10 @@ class ChihuahuaEnv(gym.Env):
         self.level.draw(self.screen)
         for ent in (self.character, self.ball, self.target):
             ent.draw(self.screen)
+        pygame.event.pump()  # keep the window responsive (OS event queue)
         pygame.display.flip()
+        # Throttle to real time only for viewing; physics use SIM_DT, not this.
+        self.clock.tick(self.metadata["render_fps"])
 
     def close(self):
         pygame.quit()
