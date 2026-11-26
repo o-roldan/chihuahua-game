@@ -30,8 +30,13 @@ class ChihuahuaEnv(gym.Env):
     # wall-clock time -> deterministic and as fast as the CPU allows.
     SIM_DT = 1.0 / metadata["render_fps"]
 
-    def __init__(self, render_mode=None):
+    # Randomized starts (training only; eval keeps the canonical start):
+    # dog x, ball x ~ U(across the floor), ball velocity ~ U(-v, v) per axis.
+    RANDOM_START_BALL_SPEED = 5.0  # 25% of BALL_MAX_SPEED
+
+    def __init__(self, render_mode=None, random_start=False):
         super().__init__()
+        self.random_start = random_start
         assert render_mode is None or render_mode in self.metadata["render_modes"]
         self.render_mode = render_mode
 
@@ -92,10 +97,62 @@ class ChihuahuaEnv(gym.Env):
         self.target = Target(target_x, target_y)
         self.prev_ball_pos = np.array([ball_x, ball_y], dtype=np.float32)
 
-    def reset(self, *, seed=None, options=None):
-        super().reset(seed=seed)
+        # Canonical start state: every reset restores exactly this snapshot
+        # (previously animation timers leaked across episodes).
         self.character.reset()
         self.ball.reset()
+        self.prev_ball_pos = np.array(self.ball.rect.center, dtype=np.float32)
+        self._initial_state = self.get_state()
+
+    # ---- Snapshot API: the simulator itself is the model ----
+    # Surfaces are stored by reference (never mutated), everything else by value.
+    def get_state(self):
+        c, b = self.character, self.ball
+        return {
+            "char_rect": tuple(c.rect),
+            "char_motion": (c.dx, c.dy, c.jumping, c.sprinting),
+            "char_state": c.current_state.name,
+            "char_image": c.image,
+            "char_anim": {
+                k: (s.current_delta, s.current_sprite)
+                for k, s in c.states_dict.items()
+                if hasattr(s, "current_delta")
+            },
+            "ball_rect": tuple(b.rect),
+            "ball_velocity": tuple(b.velocity),
+            "ball_on_ground": b.on_ground,
+            "prev_ball_pos": self.prev_ball_pos.copy(),
+        }
+
+    def set_state(self, s):
+        c, b = self.character, self.ball
+        c.rect = pygame.Rect(s["char_rect"])
+        c.dx, c.dy, c.jumping, c.sprinting = s["char_motion"]
+        c.current_state = c.states_dict[s["char_state"]]
+        c.image = s["char_image"]
+        for k, (delta, sprite) in s["char_anim"].items():
+            c.states_dict[k].current_delta = delta
+            c.states_dict[k].current_sprite = sprite
+        b.rect = pygame.Rect(s["ball_rect"])
+        b.velocity = pygame.math.Vector2(s["ball_velocity"])
+        b.on_ground = s["ball_on_ground"]
+        self.prev_ball_pos = s["prev_ball_pos"].copy()
+
+    def _randomize_start(self):
+        c, b = self.character, self.ball
+        rng = self.np_random
+        c.rect.x = int(rng.integers(0, SCREEN_WIDTH - c.rect.width + 1))
+        half = b.rect.width // 2
+        b.rect.centerx = int(rng.integers(half, SCREEN_WIDTH - half + 1))
+        v = self.RANDOM_START_BALL_SPEED
+        b.velocity = pygame.math.Vector2(*rng.uniform(-v, v, size=2))
+        self.prev_ball_pos = np.array(b.rect.center, dtype=np.float32)
+
+    def reset(self, *, seed=None, options=None):
+        super().reset(seed=seed)
+        self.set_state(self._initial_state)
+        if self.random_start:
+            self._randomize_start()
         obs = self._get_observation()
         return obs, {}
 
@@ -116,7 +173,8 @@ class ChihuahuaEnv(gym.Env):
             dtype=np.float32,
         )
 
-    def step(self, action):
+    def _simulate(self, action):
+        """Advance the game one SIM_DT tick (no reward, no rendering)."""
         # 0: No-op
         if action == 1:  # Left
             self.character.key_down(pygame.K_LEFT)
@@ -132,6 +190,9 @@ class ChihuahuaEnv(gym.Env):
         self.ball.update(self.SIM_DT)
 
         character_hits_ball(self.character, self.ball)
+
+    def step(self, action):
+        self._simulate(action)
 
         # Reward
         reward = 0
@@ -173,7 +234,9 @@ class ChihuahuaEnv(gym.Env):
         self.prev_ball_pos = ball_pos
 
         obs = self._get_observation()
-        info = {}
+        # SB3 logs rollout/success_rate from this key at episode end
+        # (False on timeouts too, so the rate is unbiased).
+        info = {"is_success": done}
 
         # Render if needed
         if self.render_mode == "human":

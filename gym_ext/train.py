@@ -3,38 +3,51 @@ from gymnasium.wrappers import TimeLimit
 from stable_baselines3 import PPO
 from gym_ext.env import ChihuahuaEnv
 
-MODEL_PATH = "models/ppo_chihuahua"
+MODELS_DIR = "models"
+MODEL_PATH = os.path.join(MODELS_DIR, "ppo_chihuahua")  # default for eval
 LOGS_PATH = "logs/ppo_tensorboard/"
 
 # Episode cap -> `truncated=True` (not `terminated`), so SB3 bootstraps V(s_T).
 # Random policy wins ~1 per 7k steps; 15k ≈ 2x that, a safe upper bound.
 MAX_EPISODE_STEPS = 15_000
 
+# Discount: effective horizon 1/(1-γ) = 1000 steps (SB3 default 0.99 -> 100).
+GAMMA = 0.999
 
-def make_env(render_mode=None):
-    env = ChihuahuaEnv(render_mode=render_mode)
+TOTAL_TIMESTEPS = 1_000_000
+
+
+def make_env(render_mode=None, random_start=False):
+    env = ChihuahuaEnv(render_mode=render_mode, random_start=random_start)
     return TimeLimit(env, max_episode_steps=MAX_EPISODE_STEPS)
 
 
-def train(render_mode=None):
-    env = make_env(render_mode=render_mode)
+def train(render_mode=None, tag="exp", seed=0, random_start=False):
+    # Always a fresh model: one run = one (tag, seed) sample, no carry-over.
+    run_name = f"{tag}_s{seed}"
+    model_path = os.path.join(MODELS_DIR, run_name)
+    env = make_env(render_mode=render_mode, random_start=random_start)
 
-    if os.path.exists(MODEL_PATH + ".zip"):
-        print(f"Loading existing model from {MODEL_PATH}")
-        model = PPO.load(MODEL_PATH, env=env)
-        model.set_env(env)
-    else:
-        print(f"Training new model and saving to {MODEL_PATH}")
-        model = PPO("MlpPolicy", env, verbose=1, tensorboard_log=LOGS_PATH)
+    print(
+        f"Training {run_name} (seed={seed}, random_start={random_start}) -> {model_path}"
+    )
+    model = PPO(
+        "MlpPolicy",
+        env,
+        gamma=GAMMA,
+        seed=seed,
+        verbose=1,
+        tensorboard_log=LOGS_PATH,
+    )
+    model.learn(total_timesteps=TOTAL_TIMESTEPS, tb_log_name=run_name)
+    model.save(model_path)
+    print(f"Model saved to {model_path}")
 
-    model.learn(total_timesteps=500_000)
-    model.save(MODEL_PATH)
-    print(f"Model saved to {MODEL_PATH}")
 
-
-def evaluate():
+def evaluate(model_path=MODEL_PATH):
+    # Always the real task: canonical start, 15k cap.
     env = make_env(render_mode="human")
-    model = PPO.load(MODEL_PATH)
+    model = PPO.load(model_path)
     obs, _ = env.reset()
 
     for _ in range(5000):
